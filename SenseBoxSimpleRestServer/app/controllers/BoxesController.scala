@@ -16,6 +16,7 @@ class BoxesController @Inject() (configuration: play.api.Configuration) extends 
   kafkaProps.put("bootstrap.servers", configuration.getString("sbsrs.kafkaServer").getOrElse("localhost:9092"))
   kafkaProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
   kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+  kafkaProps.put("max.block.ms", configuration.getString("sbsrs.kafkaMaxBlockMs").getOrElse("5000"))
 
   val kafka = new KafkaProducer[String, String](kafkaProps)
 
