@@ -23,8 +23,8 @@ class ApplicationSpec extends PlaySpec with OneAppPerTest {
       val home = route(FakeRequest(GET, "/")).get
 
       status(home) mustBe OK
-      contentType(home) mustBe Some("text/html")
-      contentAsString(home) must include ("Your new application is ready.")
+      contentType(home) mustBe Some("text/plain")
+      contentAsString(home) must include ("Simple REST API server for SenseBox.")
     }
 
   }
