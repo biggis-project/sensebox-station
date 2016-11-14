@@ -9,6 +9,7 @@ import org.apache.kafka.clients.producer._
 import play.api.libs.json._
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.concurrent.ExecutionException
 
 @Singleton
 class BoxesController @Inject() (configuration: play.api.Configuration) extends Controller {
@@ -18,7 +19,15 @@ class BoxesController @Inject() (configuration: play.api.Configuration) extends 
   kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer")
   kafkaProps.put("max.block.ms", configuration.getString("sbsrs.kafkaMaxBlockMs").getOrElse("5000"))
 
-  val kafka = new KafkaProducer[String, String](kafkaProps)
+  val kafka = try {
+    new KafkaProducer[String, String](kafkaProps)
+  }
+  catch {
+    case e: Exception => {
+      Logger.error(s"Startup error: ${e.getMessage}")
+      null
+    }
+  }
 
   val kafkaTopic = configuration.getString("sbsrs.kafkaTopic").getOrElse("sensebox-measurements")
 
@@ -38,8 +47,30 @@ class BoxesController @Inject() (configuration: play.api.Configuration) extends 
     val value = (request.body \ "value").getOrElse(Json.toJson("/kein Wert übermittelt/")).toString()
     Logger.info(s"Habe Daten für Station '$id', Senser '$sensor': $value")
 
-    val record = new ProducerRecord(kafkaTopic, "Test", msg)
-    val f = kafka.send(record) //TODO: auswerten, ggfs. 500 (Internal Server Error) zurückgeben
-    Ok("OK.")
+    val record = try {
+      new ProducerRecord(kafkaTopic, "Test", msg)
+    }
+    catch {
+      case e: Exception => {
+        Logger.error(s"Kafka error: ${e.getMessage}")
+        null
+      }
+    }
+
+    try {
+      val f = kafka.send(record)
+      f.get
+      Ok("OK.")
+    }
+    catch {
+      case e: ExecutionException => {
+        Logger.error(s"Kafka error: ${e.getMessage}")
+        InternalServerError(s"Kafka not accessible: ${e.getMessage}")
+      }
+      case e: Exception => {
+        Logger.error(s"Kafka error: ${e.getMessage}")
+        InternalServerError(s"Kafka not accessible: ${e.getMessage}")
+      }
+    }
   }
 }
