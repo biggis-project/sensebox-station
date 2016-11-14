@@ -31,9 +31,7 @@ class BoxesController @Inject() (configuration: play.api.Configuration) extends 
     var res = json.as[JsObject] + ("boxId" -> Json.toJson(id)) +
       ("sensor" -> Json.toJson(sensor))
 
-    if (!res.keys.contains("createdAt")) {
-      res += ("createdAt" -> Json.toJson(dateFormat.format(Calendar.getInstance().getTime)))
-    }
+    if (!res.keys.contains("createdAt")) res += ("createdAt" -> Json.toJson(dateFormat.format(Calendar.getInstance().getTime)))
 
     val msg = res.toString()
 
