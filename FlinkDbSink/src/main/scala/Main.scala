@@ -8,7 +8,6 @@ import org.apache.flink.streaming.util.serialization.JSONDeserializationSchema
 object Main {
   var inputKafkaTopic: String = "sensebox-measurements"
   var bootstrapServers: String = "localhost:9092"
-  var zookeeperConnect: String = "localhost:2181"
 
   def main(args: Array[String]) {
     parseOpts(args)
@@ -19,8 +18,6 @@ object Main {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     val properties = new Properties {
       put("bootstrap.servers", bootstrapServers)
-      put("zookeeper.connect", zookeeperConnect)
-      //put("group.id", "test")
     }
     val stream = env
       .addSource(function = new FlinkKafkaConsumer09[ObjectNode](inputKafkaTopic, new JSONDeserializationSchema(), properties))
@@ -47,7 +44,6 @@ object Main {
   def parseOpts(args: Array[String]) {
     args.sliding(2, 1).toList.collect {
       case Array("--bootstrap-servers", arg: String) => bootstrapServers = arg
-      case Array("--zookeeper-connect", arg: String) => zookeeperConnect = arg
       case Array("--input-kafka-topic", arg: String) => inputKafkaTopic = arg
     }
     //TODO: %ENV auswerten
