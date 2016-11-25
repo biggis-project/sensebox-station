@@ -72,11 +72,14 @@ object Main {
   }
 
   def parseOpts(args: Array[String]) {
+    //parse environment first, so that values can be overridden by command line args
+    if (sys.env.contains("DBSINK_BOOTSTRAP_SERVERS")) bootstrapServers = sys.env("DBSINK_BOOTSTRAP_SERVERS")
+    if (sys.env.contains("DBSINK_INPUT_KAFKA_TOPIC")) inputKafkaTopic  = sys.env("DBSINK_INPUT_KAFKA_TOPIC")
+
     args.sliding(2, 1).toList.collect {
       case Array("--bootstrap-servers", arg: String) => bootstrapServers = arg
-      case Array("--input-kafka-topic", arg: String) => inputKafkaTopic = arg
+      case Array("--input-kafka-topic", arg: String) => inputKafkaTopic  = arg
     }
-    //TODO: %ENV auswerten
 
     // hier prüfen ob nötige Parameter nicht angegeben wurden und ggfs. rumzicken
   }
