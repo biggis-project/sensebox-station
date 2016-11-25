@@ -20,19 +20,21 @@ object Main {
   var inputKafkaTopic: String = "sensebox-measurements"
   var bootstrapServers: String = "localhost:9092"
 
-  val db = Database.forURL("jdbc:postgresql:sbm", "sbm", "TODO: aus Cmdline") //TODO: prüfen!
-  val measurements = TableQuery[Measurements]
+  var dbConnectionString: String = "jdbc:postgresql:sbm"
+  var dbUser: String = null
+  var dbPass: String = null
 
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+
+  var db: Database = null
+  val measurements = TableQuery[Measurements]
 
   def main(args: Array[String]) {
     parseOpts(args)
 
     println(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
 
-    //setupDb
-
-    //TODO: DB-Schema verifizieren? Ggfs. erstellen? Oder nur Fehler werfen?
+    db = connectDb
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     val properties = new Properties {
@@ -44,6 +46,13 @@ object Main {
 
     //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
+  }
+
+  def connectDb = {
+    val db = Database.forURL(dbConnectionString, dbUser, dbPass) //TODO: prüfen!
+    //setupDb
+
+    db
   }
 
   def setupDb = {
@@ -73,12 +82,18 @@ object Main {
 
   def parseOpts(args: Array[String]) {
     //parse environment first, so that values can be overridden by command line args
-    if (sys.env.contains("DBSINK_BOOTSTRAP_SERVERS")) bootstrapServers = sys.env("DBSINK_BOOTSTRAP_SERVERS")
-    if (sys.env.contains("DBSINK_INPUT_KAFKA_TOPIC")) inputKafkaTopic  = sys.env("DBSINK_INPUT_KAFKA_TOPIC")
+    if (sys.env.contains("DBSINK_BOOTSTRAP_SERVERS"))    bootstrapServers   = sys.env("DBSINK_BOOTSTRAP_SERVERS")
+    if (sys.env.contains("DBSINK_INPUT_KAFKA_TOPIC"))    inputKafkaTopic    = sys.env("DBSINK_INPUT_KAFKA_TOPIC")
+    if (sys.env.contains("DBSINK_DB_CONNECTION_STRING")) dbConnectionString = sys.env("DBSINK_DB_CONNECTION_STRING")
+    if (sys.env.contains("DBSINK_DB_USER"))              dbUser             = sys.env("DBSINK_DB_USER")
+    if (sys.env.contains("DBSINK_DB_PASS"))              dbPass             = sys.env("DBSINK_DB_PASS")
 
     args.sliding(2, 1).toList.collect {
-      case Array("--bootstrap-servers", arg: String) => bootstrapServers = arg
-      case Array("--input-kafka-topic", arg: String) => inputKafkaTopic  = arg
+      case Array("--bootstrap-servers", arg: String)    => bootstrapServers   = arg
+      case Array("--input-kafka-topic", arg: String)    => inputKafkaTopic    = arg
+      case Array("--db-connection-string", arg: String) => dbConnectionString = arg
+      case Array("--db-user", arg: String)              => dbUser             = arg
+      case Array("--db-pass", arg: String)              => dbPass             = arg
     }
 
     // hier prüfen ob nötige Parameter nicht angegeben wurden und ggfs. rumzicken
