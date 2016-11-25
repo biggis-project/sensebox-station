@@ -40,27 +40,20 @@ object Main {
     }
     val stream = env
       .addSource(function = new FlinkKafkaConsumer09[ObjectNode](inputKafkaTopic, new JSONDeserializationSchema(), properties))
-//      .map { el => {
-//        //saveMeasurement(el)
-//        el
-//      } }
-      //.print
       .addSink(el => saveMeasurement(el))
 
+    //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
   }
 
   def setupDb = {
-    //val db = Database.forURL("jdbc:postgresql:sbm", "sbm", "TODO: aus Cmdline")
-    //val measurements = TableQuery[Measurements]
-
     try {
       //TODO: nur wenn noch nicht existiert
       Await.result(db.run(DBIO.seq(
         // create the schema
         measurements.schema.create
       )), Duration.Inf)
-    } finally db.close //TODO: weg, db erhalten
+    } //TODO: Fehler melden/verarbeiten
   }
 
   def saveMeasurement(ev: ObjectNode): Unit = {
