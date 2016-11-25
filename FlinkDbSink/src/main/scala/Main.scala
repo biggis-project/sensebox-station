@@ -12,6 +12,8 @@ object Main {
   def main(args: Array[String]) {
     parseOpts(args)
 
+    println(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
+
     //TODO: DB-Verbindung aufbauen
     //TODO: DB-Schema verifizieren? Ggfs. erstellen? Oder nur Fehler werfen?
 
@@ -21,11 +23,12 @@ object Main {
     }
     val stream = env
       .addSource(function = new FlinkKafkaConsumer09[ObjectNode](inputKafkaTopic, new JSONDeserializationSchema(), properties))
-      .map { el => {
-        saveMeasurement(el)
-        el
-      } }
-      .print
+//      .map { el => {
+//        //saveMeasurement(el)
+//        el
+//      } }
+      //.print
+      .addSink(el => saveMeasurement(el))
 
     env.execute("Sensebox Measurements DB Sink")
   }
@@ -34,11 +37,12 @@ object Main {
     val boxId = ev.get("boxId")
     val sensorId = ev.get("sensor")
     val value = ev.get("value")
-    val timestamp = ev.get("timestamp")
+    val timestamp = ev.get("createdAt")
 
     //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
 
     //TODO: in DB kippen
+    println(s"Könnte jetzt Wert ${value}@${timestamp} für Sensor ${sensorId}@${boxId} speichern.")
   }
 
   def parseOpts(args: Array[String]) {
