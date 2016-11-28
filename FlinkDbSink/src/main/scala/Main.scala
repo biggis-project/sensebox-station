@@ -11,10 +11,10 @@ import org.apache.flink.streaming.util.serialization.JSONDeserializationSchema
 //import slick.driver.PostgresDriver.api._
 import slick.driver.H2Driver.api._
 import slick.lifted.TableQuery
+import slick.jdbc.meta.MTable
 
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object Main {
   var inputKafkaTopic: String = "sensebox-measurements"
@@ -50,19 +50,23 @@ object Main {
 
   def connectDb = {
     val db = Database.forURL(dbConnectionString, dbUser, dbPass) //TODO: prüfen!
-    //setupDb
+    setupDb(db)
 
     db
   }
 
-  def setupDb = {
-    try {
-      //TODO: nur wenn noch nicht existiert
-      Await.result(db.run(DBIO.seq(
-        // create the schema
-        measurements.schema.create
-      )), Duration.Inf)
-    } //TODO: Fehler melden/verarbeiten
+  def setupDb(db: Database) = {
+    val tables = Await.result(db.run(MTable.getTables), 15.seconds)
+    val measurementsTables = tables.filter(t => t.name.name == "measurements" && t.name.schema.get == "public")
+
+    if (measurementsTables.size < 1) {
+      try {
+        Await.result(db.run(DBIO.seq(
+          // create the schema
+          measurements.schema.create
+        )), Duration.Inf)
+      } //TODO: Fehler melden/verarbeiten
+    }
   }
 
   def saveMeasurement(ev: ObjectNode): Unit = {
