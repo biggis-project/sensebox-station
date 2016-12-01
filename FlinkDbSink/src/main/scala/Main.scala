@@ -9,7 +9,8 @@ import org.apache.flink.streaming.util.serialization.JSONDeserializationSchema
 
 //import slick.jdbc.JdbcBackend._
 //import slick.driver.PostgresDriver.api._
-import slick.driver.H2Driver.api._
+//import slick.driver.H2Driver.api._
+import slick.driver.MySQLDriver.api._
 import slick.lifted.TableQuery
 import slick.jdbc.meta.MTable
 
@@ -49,6 +50,7 @@ object Main {
   }
 
   def connectDb = {
+    println(s"Using database ${dbConnectionString}, User ${dbUser}")
     val db = Database.forURL(dbConnectionString, dbUser, dbPass) //TODO: prüfen!
     setupDb(db)
 
@@ -57,9 +59,11 @@ object Main {
 
   def setupDb(db: Database) = {
     val tables = Await.result(db.run(MTable.getTables), 15.seconds)
-    val measurementsTables = tables.filter(t => t.name.name == "measurements" && t.name.schema.get == "public")
+    val measurementsTables = tables.filter(t => t.name.name == "measurements" && t.name.schema.get == "public")//TODO: das ist Postgres-spezifisch (nur auf TabNamen?)
 
     if (measurementsTables.size < 1) {
+      println("Creating table for SenseBox measurements ...")
+      println(measurements.schema.create.statements)
       try {
         Await.result(db.run(DBIO.seq(
           // create the schema
@@ -80,8 +84,8 @@ object Main {
     //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
 
     Await.result(db.run(DBIO.seq(
-      measurements += (boxId, sensorId, sqlTs, value, "")
-    )), Duration.Inf) //TODO: sinnvoller
+      measurements += (boxId, sensorId, sqlTs, value, null)
+    )), Duration.Inf) //TODO: sinnvoller (bspw. Futures sammeln. Kann man da irgendwie die fertigen abfragen ohne wait()?) Dann die fertigen verarbeiten (ggfs. Fehlermeldung), der Großteil dürfte ohne weitere Bearbeitung erledigt sein.
   }
 
   def parseOpts(args: Array[String]) {
