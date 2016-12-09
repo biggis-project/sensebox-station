@@ -14,3 +14,12 @@ libraryDependencies ++= Seq(
   "mysql" % "mysql-connector-java" % "5.1.40",
   "org.slf4j" % "slf4j-nop" % "1.6.4"
 )
+
+assemblyMergeStrategy in assembly := {
+  case PathList("org", "slf4j", "impl", "StaticLoggerBinder.class") => MergeStrategy.first
+  case PathList("org", "slf4j", "impl", "StaticMDCBinder.class") => MergeStrategy.first
+  case PathList("org", "slf4j", "impl", "StaticMarkerBinder.class") => MergeStrategy.first
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}

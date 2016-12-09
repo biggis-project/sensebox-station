@@ -1,3 +1,4 @@
+import java.net.URI
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Properties
@@ -6,13 +7,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
 import org.apache.flink.streaming.util.serialization.JSONDeserializationSchema
-
+import slick.backend.DatabaseConfig
+import slick.driver.JdbcProfile
+import slick.jdbc.JdbcBackend
 //import slick.jdbc.JdbcBackend._
+//import slick.profile.JdbcProfile
 //import slick.driver.PostgresDriver.api._
 //import slick.driver.H2Driver.api._
-import slick.driver.MySQLDriver.api._
-import slick.lifted.TableQuery
+//import slick.driver.MySQLDriver.api._
+//import slick.lifted.TableQuery
 import slick.jdbc.meta.MTable
+//import slick.backend._
+import slick.dbio._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -27,8 +33,8 @@ object Main {
 
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 
-  var db: Database = null
-  val measurements = TableQuery[Measurements]
+  var db: JdbcBackend#DatabaseDef = null
+  //var measurements: Any = null // = TableQuery[Measurements]
 
   def main(args: Array[String]) {
     parseOpts(args)
@@ -49,15 +55,21 @@ object Main {
     env.execute("Sensebox Measurements DB Sink")
   }
 
-  def connectDb = {
+  def connectDb: JdbcBackend#DatabaseDef = {
     println(s"Using database ${dbConnectionString}, User ${dbUser}")
-    val db = Database.forURL(dbConnectionString, dbUser, dbPass) //TODO: prüfen!
-    setupDb(db)
+    val dc = DatabaseConfig.forURI[JdbcProfile](new URI(dbConnectionString))
+    import dc.driver.api._
 
-    db
-  }
+    //val db = Database.forURL(dbConnectionString, dbUser, dbPass) //TODO: prüfen!
+    val db = dc.db
 
-  def setupDb(db: Database) = {
+    val measurements = TableQuery[Measurements]
+//    setupDb(db)
+
+    //return db
+//  }
+
+//  def setupDb(db: Database) = {
     val tables = Await.result(db.run(MTable.getTables), 15.seconds)
     val measurementsTables = tables.filter(t => t.name.name == "measurements" && t.name.schema.get == "public")//TODO: das ist Postgres-spezifisch (nur auf TabNamen?)
 
@@ -71,6 +83,8 @@ object Main {
         )), Duration.Inf)
       } //TODO: Fehler melden/verarbeiten
     }
+
+    return db
   }
 
   def saveMeasurement(ev: ObjectNode): Unit = {
@@ -83,9 +97,9 @@ object Main {
 
     //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
 
-    Await.result(db.run(DBIO.seq(
-      measurements += (boxId, sensorId, sqlTs, value, null)
-    )), Duration.Inf) //TODO: sinnvoller (bspw. Futures sammeln. Kann man da irgendwie die fertigen abfragen ohne wait()?) Dann die fertigen verarbeiten (ggfs. Fehlermeldung), der Großteil dürfte ohne weitere Bearbeitung erledigt sein.
+//    Await.result(db.run(DBIO.seq(
+  //    measurements += (boxId, sensorId, sqlTs, value, null)
+    //)), Duration.Inf) //TODO: sinnvoller (bspw. Futures sammeln. Kann man da irgendwie die fertigen abfragen ohne wait()?) Dann die fertigen verarbeiten (ggfs. Fehlermeldung), der Großteil dürfte ohne weitere Bearbeitung erledigt sein.
   }
 
   def parseOpts(args: Array[String]) {
@@ -96,6 +110,7 @@ object Main {
     if (sys.env.contains("DBSINK_DB_USER"))              dbUser             = sys.env("DBSINK_DB_USER")
     if (sys.env.contains("DBSINK_DB_PASS"))              dbPass             = sys.env("DBSINK_DB_PASS")
 
+    //TODO: "--db-user=sbm" verarbeitet das natürlich nicht
     args.sliding(2, 1).toList.collect {
       case Array("--bootstrap-servers", arg: String)    => bootstrapServers   = arg
       case Array("--input-kafka-topic", arg: String)    => inputKafkaTopic    = arg
