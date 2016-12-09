@@ -1,4 +1,4 @@
-import java.net.URI
+import java.sql.Connection
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Properties
@@ -7,21 +7,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
 import org.apache.flink.streaming.util.serialization.JSONDeserializationSchema
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcProfile
-import slick.jdbc.JdbcBackend
-//import slick.jdbc.JdbcBackend._
-//import slick.profile.JdbcProfile
-//import slick.driver.PostgresDriver.api._
-//import slick.driver.H2Driver.api._
-//import slick.driver.MySQLDriver.api._
-//import slick.lifted.TableQuery
-import slick.jdbc.meta.MTable
-//import slick.backend._
-import slick.dbio._
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
+import scalikejdbc.ConnectionPool
+import anorm._
 
 object Main {
   var inputKafkaTopic: String = "sensebox-measurements"
@@ -33,15 +21,27 @@ object Main {
 
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 
-  var db: JdbcBackend#DatabaseDef = null
-  //var measurements: Any = null // = TableQuery[Measurements]
+  //taken from https://github.com/TimothyKlim/anorm-without-play/blob/master/src/main/scala/Main.scala
+  //via http://stackoverflow.com/a/25584627
+  object DB {
+    def withConnection[A](block: Connection => A): A = {
+      val connection: Connection = ConnectionPool.borrow()
+
+      try {
+        block(connection)
+      } finally {
+        connection.close()
+      }
+    }
+  }
 
   def main(args: Array[String]) {
     parseOpts(args)
 
     println(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
 
-    db = connectDb
+    ConnectionPool.singleton(dbConnectionString, dbUser, dbPass)
+    //TODO: setupDb() bzw. Tabellenexistenz prüfen (oder zumindest erkennen, wenn die Tabelle nicht existiert und mit sinnvollem Fehler sterben)
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     val properties = new Properties {
@@ -55,38 +55,6 @@ object Main {
     env.execute("Sensebox Measurements DB Sink")
   }
 
-  def connectDb: JdbcBackend#DatabaseDef = {
-    println(s"Using database ${dbConnectionString}, User ${dbUser}")
-    val dc = DatabaseConfig.forURI[JdbcProfile](new URI(dbConnectionString))
-    import dc.driver.api._
-
-    //val db = Database.forURL(dbConnectionString, dbUser, dbPass) //TODO: prüfen!
-    val db = dc.db
-
-    val measurements = TableQuery[Measurements]
-//    setupDb(db)
-
-    //return db
-//  }
-
-//  def setupDb(db: Database) = {
-    val tables = Await.result(db.run(MTable.getTables), 15.seconds)
-    val measurementsTables = tables.filter(t => t.name.name == "measurements" && t.name.schema.get == "public")//TODO: das ist Postgres-spezifisch (nur auf TabNamen?)
-
-    if (measurementsTables.size < 1) {
-      println("Creating table for SenseBox measurements ...")
-      println(measurements.schema.create.statements)
-      try {
-        Await.result(db.run(DBIO.seq(
-          // create the schema
-          measurements.schema.create
-        )), Duration.Inf)
-      } //TODO: Fehler melden/verarbeiten
-    }
-
-    return db
-  }
-
   def saveMeasurement(ev: ObjectNode): Unit = {
     val boxId = ev.get("boxId").asText
     val sensorId = ev.get("sensor").asText
@@ -97,9 +65,10 @@ object Main {
 
     //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
 
-//    Await.result(db.run(DBIO.seq(
-  //    measurements += (boxId, sensorId, sqlTs, value, null)
-    //)), Duration.Inf) //TODO: sinnvoller (bspw. Futures sammeln. Kann man da irgendwie die fertigen abfragen ohne wait()?) Dann die fertigen verarbeiten (ggfs. Fehlermeldung), der Großteil dürfte ohne weitere Bearbeitung erledigt sein.
+    DB.withConnection { implicit connection: Connection =>
+      SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute(); //TODO: Fehlerbehandlung
+      //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert
+    }
   }
 
   def parseOpts(args: Array[String]) {
