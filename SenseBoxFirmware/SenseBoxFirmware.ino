@@ -16,7 +16,7 @@
 #include <WiFi101.h>
 #include <Makerblog_TSL45315.h>
 
-//Custom WiFi Parameters (never commit to Git!)
+//Custom WiFi Parameters
 char ssid[] = "...";      //  your network SSID (name)
 char pass[] = "...";      // your network password
 
@@ -101,21 +101,22 @@ void setup() {
 
 void loop() {
   httpRequest(TEMPSENSOR_ID, String(HDC.getTemp()));
-  delay(5000);
+  delay(1000);
   httpRequest(HUMISENSOR_ID, String(HDC.getHumi()));
-  delay(5000);
+  delay(1000);
   result = BMP.startMeasurment();
   if (result != 0) {
     delay(result);
     result = BMP.getTemperatureAndPressure(tempBaro, pressure);
   }
-  delay(5000);
+  delay(1000);
   httpRequest(PRESSURESENSOR_ID, String(pressure));
-  delay(5000);
+  delay(1000);
   httpRequest(LUXSENSOR_ID, String(TSL.readLux()));
-  delay(5000);
+  delay(1000);
   httpRequest(UVSENSOR_ID, String(getUV()));
-  delay(10000);
+  Serial.println("===");
+  delay(15000);
 }
 
 void httpRequest(String sensorId, String value) {
