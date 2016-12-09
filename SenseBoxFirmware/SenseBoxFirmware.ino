@@ -130,7 +130,10 @@ void httpRequest(String sensorId, String value) {
   }
   // if there's a successful connection:
   if (client.connect(server, serverPort)) {
-    Serial.print("connecting...");
+    Serial.print("connecting ... ");
+    Serial.print(sensorId);
+    Serial.print("=");
+    Serial.print(value);
     // send the HTTP PUT request:
     client.print("POST /boxes/");
     client.print(SENSEBOX_ID);
@@ -149,7 +152,7 @@ void httpRequest(String sensorId, String value) {
     client.println();
     client.print(valueJson);
     client.println();
-    Serial.println("done!");
+    Serial.println(" ==> done!");
     client.stop();
   }
   else {
