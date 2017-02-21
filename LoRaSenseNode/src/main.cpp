@@ -9,7 +9,7 @@
 #include <Wire.h>
 #include "Adafruit_HDC1000.h"
 #include "Adafruit_BMP280.h"
-//#include <Makerblog_TSL45315.h>
+#include <Makerblog_TSL45315.h>
 #include <SPI.h>
 
 #include <lmic.h>
@@ -18,8 +18,7 @@
 #include <avr/wdt.h>
 
 //Load sensors
-//Makerblog_TSL45315 TSL = Makerblog_TSL45315(TSL45315_TIME_M4);
-//HDC100X HDC(0x43);
+Makerblog_TSL45315 tsl = Makerblog_TSL45315(TSL45315_TIME_M4);
 Adafruit_HDC1000 hdc = Adafruit_HDC1000();
 Adafruit_BMP280 bmp;
 
@@ -70,6 +69,23 @@ void reboot () {
   asm volatile (" jmp 0");
 }
 
+uint16_t getUV() {
+  byte msb = 0, lsb = 0;
+  uint16_t uvValue;
+
+  Wire.requestFrom(UV_ADDR + 1, 1); //MSB
+  delay(1);
+  if (Wire.available()) msb = Wire.read();
+
+  Wire.requestFrom(UV_ADDR + 0, 1); //LSB
+  delay(1);
+  if (Wire.available()) lsb = Wire.read();
+
+  uvValue = (msb << 8) | lsb;
+
+  return uvValue * 5;
+}
+
 void do_send(osjob_t* j) {
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) {
@@ -105,7 +121,7 @@ void do_send(osjob_t* j) {
 
     //-----Lux-----//
     Serial.print("illuminance: ");
-    //lux = TSL.readLux();
+    lux = tsl.readLux();
     Serial.println(lux);
     message.addUint8(lux % 255);
     message.addUint16(lux / 255);
@@ -113,18 +129,10 @@ void do_send(osjob_t* j) {
 
     //UV intensity
     Serial.print("uv: ");
-    //uv = getUV();
+    uv = getUV();
     Serial.println(uv);
     message.addUint8(uv % 255);
     message.addUint16(uv / 255);
-
-    /*
-    message.addUint8('H');
-    message.addUint8('e');
-    message.addUint8('l');
-    message.addUint8('L');
-    message.addUint8('O');
-    */
 
     // Prepare upstream data transmission at the next possible time.
     LMIC_setTxData2(1, message.getBytes(), message.getLength(), 0);
@@ -210,9 +218,9 @@ void onEvent (ev_t ev) {
 void initSensors() {
   Serial.println(F("Initializing sensors..."));
   Wire.begin();
-  /*Wire.beginTransmission(UV_ADDR);
+  Wire.beginTransmission(UV_ADDR);
   Wire.write((IT_1 << 2) | 0x02);
-  Wire.endTransmission();*/
+  Wire.endTransmission();
   Serial.println("CP1");
   delay(500);
 
@@ -223,7 +231,7 @@ void initSensors() {
   hdc.readHumidity(); // same
   Serial.println("CP2");
 
-  //TSL.begin();
+  tsl.begin();
   Serial.println("CP3");
 
   if (!bmp.begin())
