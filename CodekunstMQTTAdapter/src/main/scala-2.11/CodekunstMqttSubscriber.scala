@@ -81,9 +81,35 @@ object CodekunstMqttSubscriber {
   }
 
   def parseMessage(message: MqttMessage): Unit = {
-    val inputJson = Json.parse(message.toString) //TODO: das verträgt keinen Müll!
+    val inputJson: JsObject = try {
+      Json.parse(message.toString).as[JsObject]
+    }
+    catch {
+      case e: Exception => {
+        println(e)
+        return
+      }
+    }
+
+    if (!inputJson.keys.contains("devEUI")) {
+      println("Incoming JSON does not contain necessary key 'devEUI'. Ignoring message.")
+      return
+    }
     val devEUI = (inputJson \ "devEUI").as[String]
+
+    if (!inputJson.keys.contains("rxInfo")
+      || !(inputJson \ "rxInfo").get.isInstanceOf[JsArray]
+      || !(inputJson \ "rxInfo")(0).get.isInstanceOf[JsObject]
+      || !(inputJson \ "rxInfo")(0).as[JsObject].keys.contains("time")) {
+      println("Incoming JSON does not contain necessary key 'rxInfo[0].time'. Ignoring message.")
+      return
+    }
     val inputTS = ((inputJson \ "rxInfo")(0) \ "time").as[String]
+
+    if (!inputJson.keys.contains("data")) {
+      println("Incoming JSON does not contain necessary key 'data'. Ignoring message.")
+      return
+    }
     val rawData = (inputJson \ "data").as[String]
     println(inputJson)
 
