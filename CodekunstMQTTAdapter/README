@@ -1,0 +1,24 @@
+Codekunst-MQTT-Adapter
+======================
+
+Übersetzen
+----------
+
+Der Codekunst-MQTT-Apapter kann per "sbt assembly" mit allen Abhängigkeiten in ein JAR
+gepackt werden.
+
+
+Ausführen
+---------
+
+$ java [-Dparameter=wert ...] -jar CodekunstMQTTAdapter-assembly-1.0.jar
+
+Gültige Parameter:
+
+mqtt.brokerUrl   Die Adresse des MQTT-Brokers (Default: 'tcp://localhost:1883')
+                 Für SSL: ssl://hostname:8883
+mqtt.topic       Das Topic, das abonniert wird. Der Default 'application/+/node/+/rx'
+                 passt für den Codekunst-Server
+kafka.server     Der (oder die) Kafka-Server (Default: 'localhost:9092')
+                 Mehrere Server als 'server1:port1,server2:port2,...'
+kafka.topic      Das Kafka-Topic, an das gesendet wird (Default: 'sensebox-measurements')
