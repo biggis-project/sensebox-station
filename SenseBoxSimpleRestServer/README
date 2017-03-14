@@ -1,49 +1,39 @@
-This is your new Play application
-=================================
+Building
+========
 
-This file will be packaged with your application when using `activator dist`.
+This project supports sbt-assembly to package the server with all dependencies.
+Just run "sbt assembly".
 
-There are several demonstration files available in this template.
 
-Controllers
-===========
-
-- HomeController.scala:
-
-  Shows how to handle simple HTTP requests.
-
-- AsyncController.scala:
-
-  Shows how to do asynchronous programming when handling a request.
-
-- CountController.scala:
-
-  Shows how to inject a component into a controller and use the component when
-  handling requests.
-
-Components
-==========
-
-- Module.scala:
-
-  Shows how to use Guice to bind all the components needed by your application.
-
-- Counter.scala:
-
-  An example of a component that contains state, in this case a simple counter.
-
-- ApplicationTimer.scala:
-
-  An example of a component that starts when the application starts and stops
-  when the application stops.
-
-Filters
+Running
 =======
 
-- Filters.scala:
+The packaged jar can be run with "java -jar sensebox-simple-rest-server-assembly-$version.jar"
 
-  Creates the list of HTTP filters used by your application.
 
-- ExampleFilter.scala
+Configuring
+===========
 
-  A simple filter that adds a header to every response.
+SenseboxSimpleRESTServer takes a config file on HOCON format (see https://www.playframework.com/documentation/2.5.x/ConfigFile
+for details). The config file must be specified by using the parameter "-Dconfig.file=$filename" (which must be put in
+front of "-jar ...").
+
+http.port
+        The HTTP port SBSRS is listening. Default: "9000".
+
+sbsrs.kafkaServer
+        The Kafka server SBSRS connects to. You can provide multiple server as "server1:port1,server2:port2,...". Default: "localhost:9092"
+
+sbsrs.kafkaTopic
+        The Kafka topic to which SBSRS published sensor reading messages. Default: "sensebox-measurements"
+
+sbsrs.kafkaMaxBlockMs
+        Time in milliseconds how long Kafka will block when sending a record. See http://kafka.apache.org/documentation/#producerapi for details. Default: "5000"
+
+play.crypto.secret
+        Used by Play Framework to sign session cookies and for built-in encryption tools.
+        As SBSRS does not use sessions or encryption, it is unneccessary, but Play requires it to be set to a value other than "changeme".
+        For details see https://www.playframework.com/documentation/2.5.x/ApplicationSecret
+
+Alternatively to putting the config into a file, you can specify the parameters on command line as java system properties.
+E.g. "java -Dkafka.server=kafka01.fzi.de:9092,kafka02.fzi.de:9092 -Dplay.crypto.secret=42 -jar sensebox-simple-rest-server-assembly-$version.jar"
