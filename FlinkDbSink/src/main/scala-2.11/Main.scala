@@ -7,18 +7,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
 import org.apache.flink.streaming.util.serialization.JSONDeserializationSchema
+import org.apache.flink.api.java.utils.ParameterTool
 
 import scalikejdbc.ConnectionPool
 import anorm._
 
+import org.slf4j.LoggerFactory
+import org.slf4j.Logger
+
 object Main {
-  var inputKafkaTopic: String = "sensebox-measurements"
-  var bootstrapServers: String = "localhost:9092"
-
-  var dbConnectionString: String = "jdbc:postgresql:sbm"
-  var dbUser: String = null
-  var dbPass: String = null
-
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 
   //taken from https://github.com/TimothyKlim/anorm-without-play/blob/master/src/main/scala/Main.scala
@@ -35,12 +32,21 @@ object Main {
     }
   }
 
-  def main(args: Array[String]) {
-    parseOpts(args)
+  def main(args: Array[String]): Unit = {
+    val paramCmdline = ParameterTool.fromArgs(args)
+    val paramDefaults = ParameterTool.fromArgs(Array("--bootstrap-servers", "localhost:9092",
+                                                     "--input-kafka-topic", "sensebox-measurements",
+                                                     "--db-connection-string", "jdbc:postgresql:sbm"))
 
-    println(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
+    val params = paramDefaults.mergeWith(paramCmdline)
 
-    ConnectionPool.singleton(dbConnectionString, dbUser, dbPass)
+    val bootstrapServers = params.get("bootstrap-servers")
+    val inputKafkaTopic = params.get("input-kafka-topic")
+
+    val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.main")
+    logger.info(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
+
+    ConnectionPool.singleton(params.get("db-connection-string"), params.get("db-user"), params.get("dbPass"))
     //TODO: setupDb() bzw. Tabellenexistenz prüfen (oder zumindest erkennen, wenn die Tabelle nicht existiert und mit sinnvollem Fehler sterben)
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -49,13 +55,19 @@ object Main {
     }
     val stream = env
       .addSource(function = new FlinkKafkaConsumer09[ObjectNode](inputKafkaTopic, new JSONDeserializationSchema(), properties))
-      .addSink(el => saveMeasurement(el))
+      //TODO: split() nach gültig/ungültig
+      //TODO: ungültig per Kafka raus
+      //TODO: split(gültig) nach Duplikat/Unikat
+      //TODO: Duplikat per Kafka raus
+      .addSink(el => saveMeasurement(params, el)) //TODO: nur Unikat
 
     //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
   }
 
-  def saveMeasurement(ev: ObjectNode): Unit = {
+  def saveMeasurement(params: ParameterTool, ev: ObjectNode): Unit = {
+    val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.saveMeasurements")
+
     val boxId = ev.get("boxId").asText
     val sensorId = ev.get("sensor").asText
     val value = ev.get("value").asDouble
@@ -63,31 +75,14 @@ object Main {
     val ts = dateFormat.parse(timestamp)
     val sqlTs = new Timestamp(ts.getTime)
 
+    logger.info(s"Got event for $boxId/$sensorId: $value")
+
+    //TODO: Datenbankverbindung hier ggfs. aufbauen. singleton?
     //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
 
     DB.withConnection { implicit connection: Connection =>
       SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute(); //TODO: Fehlerbehandlung
-      //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert
+      //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert (möglichst auch mit (konfigurierbarem) deltaTimestamp weil das über Codekunst und TTN mit leicht unterschiedlichem TS reinkam)
     }
-  }
-
-  def parseOpts(args: Array[String]) {
-    //parse environment first, so that values can be overridden by command line args
-    if (sys.env.contains("DBSINK_BOOTSTRAP_SERVERS"))    bootstrapServers   = sys.env("DBSINK_BOOTSTRAP_SERVERS")
-    if (sys.env.contains("DBSINK_INPUT_KAFKA_TOPIC"))    inputKafkaTopic    = sys.env("DBSINK_INPUT_KAFKA_TOPIC")
-    if (sys.env.contains("DBSINK_DB_CONNECTION_STRING")) dbConnectionString = sys.env("DBSINK_DB_CONNECTION_STRING")
-    if (sys.env.contains("DBSINK_DB_USER"))              dbUser             = sys.env("DBSINK_DB_USER")
-    if (sys.env.contains("DBSINK_DB_PASS"))              dbPass             = sys.env("DBSINK_DB_PASS")
-
-    //TODO: "--db-user=sbm" verarbeitet das natürlich nicht
-    args.sliding(2, 1).toList.collect {
-      case Array("--bootstrap-servers", arg: String)    => bootstrapServers   = arg
-      case Array("--input-kafka-topic", arg: String)    => inputKafkaTopic    = arg
-      case Array("--db-connection-string", arg: String) => dbConnectionString = arg
-      case Array("--db-user", arg: String)              => dbUser             = arg
-      case Array("--db-pass", arg: String)              => dbPass             = arg
-    }
-
-    // hier prüfen ob nötige Parameter nicht angegeben wurden und ggfs. rumzicken
   }
 }

@@ -12,8 +12,7 @@ libraryDependencies ++= Seq(
   "org.scalikejdbc" % "scalikejdbc_2.11" % "2.5.0",
   "org.postgresql" % "postgresql" % "9.4-1201-jdbc41",
   //"mysql" % "mysql-connector-java" % "6.0.5", //version throws "java.sql.SQLException: Table name pattern can not be NULL or empty." bei MTable.getTables
-  "mysql" % "mysql-connector-java" % "5.1.40",
-  "org.slf4j" % "slf4j-nop" % "1.6.4"
+  "mysql" % "mysql-connector-java" % "5.1.40"
 )
 
 assemblyMergeStrategy in assembly := {
