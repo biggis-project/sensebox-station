@@ -41,7 +41,9 @@ object Main {
     val paramCmdline = ParameterTool.fromArgs(args)
     val paramDefaults = ParameterTool.fromArgs(Array("--bootstrap-servers", "localhost:9092",
                                                      "--kafka-input-topic", "sensebox-measurements",
-                                                     "--kafka-output-topic-unparseable", "sensebox-measurements-error-unparseable",
+                                                     "--kafka-output-topic-unparseable", "sensebox-measurements-error",
+                                                     "--kafka-output-topic-invalid", "sensebox-measurements-error",
+                                                     "--kafka-output-topic-duplicate", "sensebox-measurements-error",
                                                      "--kafka-group-id", "FlinkDbSink",
                                                      "--db-connection-string", "jdbc:postgresql:sbm"))
 
@@ -66,20 +68,34 @@ object Main {
 
     val jsonStream = inputStream.map(record => deserialize(record))
 
-    val splitStream = jsonStream.split(el => el.keys.contains("error") match {
+    val parseableSplitStream = jsonStream.split(el => el.keys.contains("error") match {
       case true => List("error")
       case false => List("ok")
     })
 
-    splitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-unparseable"), new SimpleStringSchema(), properties))
+    parseableSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-unparseable"), new SimpleStringSchema(), properties))
 
-    val validatedStream = splitStream.select("ok").map(el => validateJson(el))
+    val validatedStream = parseableSplitStream.select("ok").map(el => validateJson(el))
 
-    //TODO: split(gültig) nach Duplikat/Unikat
-    //TODO: Duplikat per Kafka raus
+    val validatedSplitStream = validatedStream.split(el => el.keys.contains("error") match {
+      case true => List("error")
+      case false => List("ok")
+    })
 
-    validatedStream.print()
-    //inputStream.addSink(el => saveMeasurement(params, el)) //TODO: nur Unikat
+    validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-invalid"), new SimpleStringSchema(), properties))
+
+    val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(el))
+
+    val uniquenessCheckedSplitStream = uniquenessCheckedStream.split(el => el.keys.contains("error") match {
+      case true => List("error")
+      case false => List("ok")
+    })
+
+    uniquenessCheckedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-duplicate"), new SimpleStringSchema(), properties))
+
+    uniquenessCheckedSplitStream.select("ok")
+      //.print()
+      .addSink(el => saveMeasurement(params, el))
 
     //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
@@ -105,29 +121,42 @@ object Main {
   }
 
   def validateJson(json: JsObject): JsObject = {
-    val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.deserialize")
+    val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.validateJson")
+
+    //TODO
 
     return json
   }
 
-  def saveMeasurement(params: ParameterTool, ev: ObjectNode): Unit = {
+  def checkUnique(json: JsObject): JsObject = {
+    val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.checkUnique")
+
+    //TODO
+
+    return json
+  }
+
+  def saveMeasurement(params: ParameterTool, ev: JsObject): Unit = {
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.saveMeasurements")
 
-    val boxId = ev.get("boxId").asText
-    val sensorId = ev.get("sensor").asText
-    val value = ev.get("value").asDouble
-    val timestamp = ev.get("createdAt").asText
+    val input = ev \ "input"
+
+    val boxId = (input \ "boxId").as[String]
+    val sensorId = (input \ "sensor").as[String]
+    val value = (input \ "value").as[Double]
+    val timestamp = (input \ "createdAt").as[String]
+
     val ts = dateFormat.parse(timestamp)
     val sqlTs = new Timestamp(ts.getTime)
 
-    logger.info(s"Got event for $boxId/$sensorId: $value")
+    logger.info(s"Got event for $boxId/$sensorId@$ts: $value")
 
     //TODO: Datenbankverbindung hier ggfs. aufbauen. singleton?
     //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
-
+/*
     DB.withConnection { implicit connection: Connection =>
       SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute(); //TODO: Fehlerbehandlung
       //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert (möglichst auch mit (konfigurierbarem) deltaTimestamp weil das über Codekunst und TTN mit leicht unterschiedlichem TS reinkam)
-    }
+    }*/
   }
 }
