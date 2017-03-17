@@ -21,6 +21,17 @@ Docs: https://kafka.apache.org/documentation#producerconfigs
 
 
 
+Kafka Group ID
+--------------
+
+Command line: "--kafka-group-id"
+
+Default value: "FlinkDbSink",
+
+Expected value: any string (as supported by Apache Kafka)
+
+
+
 Input Kafka Topic
 -----------------
 
@@ -29,6 +40,19 @@ Command line: "--kafka-input-topic"
 Default value: "sensebox-measurements"
 
 Expected value: any string (as supported by Apache Kafka)
+
+
+
+Output Kafka Topics
+-------------------
+
+Command line: "kafka-output-topic-unparsable", "--kafka-output-topic-invalid", "--kafka-output-topic-invalid"
+
+Default value: "sensebox-measurements-error"
+
+Expected value: any string (as supported by Apache Kafka)
+
+An empty string('', just the quotes) disables output for the respective error type.
 
 
 
@@ -52,6 +76,8 @@ Command line: "--db-user"
 
 Default value: null
 
+For db-user (as for db-pass) a null value does not trigger an exception, it just connects without user/password.
+This works (at least) for PostgreSQL on localhost.
 
 
 DB Pass

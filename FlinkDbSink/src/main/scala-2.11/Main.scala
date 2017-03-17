@@ -73,7 +73,8 @@ object Main {
       case false => List("ok")
     })
 
-    parseableSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-unparseable"), new SimpleStringSchema(), properties))
+    if (params.get("kafka-output-topic-unparseable") != "''")
+      parseableSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-unparseable"), new SimpleStringSchema(), properties))
 
     val validatedStream = parseableSplitStream.select("ok").map(el => validateJson(el))
 
@@ -82,8 +83,8 @@ object Main {
       case false => List("ok")
     })
 
-    //TODO: Error-Stream abschaltbar machen indem man einen leeren String als Topic übergibt
-    validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-invalid"), new SimpleStringSchema(), properties))
+    if (params.get("kafka-output-topic-invalid") != "''")
+      validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-invalid"), new SimpleStringSchema(), properties))
 
     val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(el))
 
@@ -92,11 +93,10 @@ object Main {
       case false => List("ok")
     })
 
-    uniquenessCheckedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-duplicate"), new SimpleStringSchema(), properties))
+    if (params.get("kafka-output-topic-duplicate") != "''")
+      uniquenessCheckedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-duplicate"), new SimpleStringSchema(), properties))
 
-    uniquenessCheckedSplitStream.select("ok")
-      //.print()
-      .addSink(el => saveMeasurement(params, el))
+    uniquenessCheckedSplitStream.select("ok").addSink(el => saveMeasurement(params, el))
 
     //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
