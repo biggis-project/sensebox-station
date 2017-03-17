@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   "org.apache.flink" % "flink-streaming-scala_2.11" % "1.2.0",
   "org.apache.flink" % "flink-connector-kafka-0.9_2.11" % "1.2.0",
   "com.typesafe.play" %% "anorm" % "2.5.0",
+  "com.typesafe.play" % "play-json_2.11" % "2.5.12",
   "org.scalikejdbc" % "scalikejdbc_2.11" % "2.5.0",
   "org.postgresql" % "postgresql" % "9.4-1201-jdbc41",
   //"mysql" % "mysql-connector-java" % "6.0.5", //version throws "java.sql.SQLException: Table name pattern can not be NULL or empty." bei MTable.getTables
