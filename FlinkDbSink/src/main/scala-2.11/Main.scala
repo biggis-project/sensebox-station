@@ -74,7 +74,7 @@ object Main {
     })
 
     if (params.get("kafka-output-topic-unparseable") != "''")
-      parseableSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-unparseable"), new SimpleStringSchema(), properties))
+      parseableSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-unparseable"), new SimpleStringSchema()))
 
     val validatedStream = parseableSplitStream.select("ok").map(el => validateJson(el))
 
@@ -84,7 +84,7 @@ object Main {
     })
 
     if (params.get("kafka-output-topic-invalid") != "''")
-      validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-invalid"), new SimpleStringSchema(), properties))
+      validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-invalid"), new SimpleStringSchema()))
 
     val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(el))
 
@@ -94,7 +94,7 @@ object Main {
     })
 
     if (params.get("kafka-output-topic-duplicate") != "''")
-      uniquenessCheckedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-duplicate"), new SimpleStringSchema(), properties))
+      uniquenessCheckedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-duplicate"), new SimpleStringSchema()))
 
     uniquenessCheckedSplitStream.select("ok").addSink(el => saveMeasurement(params, el))
 
