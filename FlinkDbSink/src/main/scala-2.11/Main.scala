@@ -54,7 +54,7 @@ object Main {
 
     logger.info(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
 
-    ConnectionPool.singleton(params.get("db-connection-string"), params.get("db-user"), params.get("dbPass"))
+    ConnectionPool.singleton(params.get("db-connection-string"), params.get("db-user"), params.get("db-pass"))
     //TODO: setupDb() bzw. Tabellenexistenz prüfen (oder zumindest erkennen, wenn die Tabelle nicht existiert und mit sinnvollem Fehler sterben)
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -82,6 +82,7 @@ object Main {
       case false => List("ok")
     })
 
+    //TODO: Error-Stream abschaltbar machen indem man einen leeren String als Topic übergibt
     validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(params.get("kafka-output-topic-invalid"), new SimpleStringSchema(), properties))
 
     val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(el))
@@ -131,13 +132,15 @@ object Main {
   def checkUnique(json: JsObject): JsObject = {
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.checkUnique")
 
-    //TODO
+    //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert (möglichst auch mit (konfigurierbarem) deltaTimestamp weil das über Codekunst und TTN mit leicht unterschiedlichem TS reinkam)
 
     return json
   }
 
   def saveMeasurement(params: ParameterTool, ev: JsObject): Unit = {
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.saveMeasurements")
+
+    ConnectionPool.singleton(params.get("db-connection-string"), params.get("db-user"), params.get("db-pass"))
 
     val input = ev \ "input"
 
@@ -151,12 +154,13 @@ object Main {
 
     logger.info(s"Got event for $boxId/$sensorId@$ts: $value")
 
-    //TODO: Datenbankverbindung hier ggfs. aufbauen. singleton?
-    //TODO: Werte prüfen, fehlerhafte loggen (oder in Kafka-Stream?)
-/*
-    DB.withConnection { implicit connection: Connection =>
-      SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute(); //TODO: Fehlerbehandlung
-      //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert (möglichst auch mit (konfigurierbarem) deltaTimestamp weil das über Codekunst und TTN mit leicht unterschiedlichem TS reinkam)
-    }*/
+    try {
+      DB.withConnection { implicit connection: Connection =>
+        SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute(); //TODO: Fehlerbehandlung
+      }
+    }
+    catch {
+      case e: Exception => logger.error(e.getMessage)
+    }
   }
 }
