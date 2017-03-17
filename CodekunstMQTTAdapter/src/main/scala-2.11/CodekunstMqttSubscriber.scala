@@ -113,6 +113,16 @@ object CodekunstMqttSubscriber {
     val rawData = (inputJson \ "data").as[String]
     println(inputJson)
 
+    val seconds = "\\d{2}\\.\\d+".r findFirstIn inputTS
+    val tempTS = seconds match {
+      case Some(i) => {
+        val roundedSeconds = math.rint(i.toFloat * 1000) / 1000
+        inputTS replaceFirst(i, s"$roundedSeconds")
+      }
+      case None => inputTS
+    }
+    val outputTS = tempTS replaceFirst("Z$", "+0000")
+
     // decodeBuffer liefert Bytes statt Chars, deswegen fixen wir das per map()
     val bytes = base64Decoder.decodeBuffer(rawData).map((i: Byte) => if (i < 0) i + 256 else i)
 
@@ -123,12 +133,12 @@ object CodekunstMqttSubscriber {
     val lux = bytes(8) + 255 * (bytes(10)*256 + bytes(9))
     val uv = bytes(11) + 255 * (bytes(13)*256 + bytes(12))
 
-    sendValue(devEUI, inputTS, "temperature", temperature)
-    sendValue(devEUI, inputTS, "humidity", humidity)
-    sendValue(devEUI, inputTS, "pressure", pressure)
-    sendValue(devEUI, inputTS, "temperatureInternal", temperatureIntern)
-    sendValue(devEUI, inputTS, "light", lux)
-    sendValue(devEUI, inputTS, "uv", uv)
+    sendValue(devEUI, outputTS, "temperature", temperature)
+    sendValue(devEUI, outputTS, "humidity", humidity)
+    sendValue(devEUI, outputTS, "pressure", pressure)
+    sendValue(devEUI, outputTS, "temperatureInternal", temperatureIntern)
+    sendValue(devEUI, outputTS, "light", lux)
+    sendValue(devEUI, outputTS, "uv", uv)
   }
 
   def sendValue(boxId: String, timestamp: String, sensor: String, value: Double): Unit = {
