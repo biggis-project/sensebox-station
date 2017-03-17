@@ -24,7 +24,7 @@ Docs: https://kafka.apache.org/documentation#producerconfigs
 Input Kafka Topic
 -----------------
 
-Command line: "--input-kafka-topic"
+Command line: "--kafka-input-topic"
 
 Default value: "sensebox-measurements"
 

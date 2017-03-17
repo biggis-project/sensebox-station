@@ -35,13 +35,14 @@ object Main {
   def main(args: Array[String]): Unit = {
     val paramCmdline = ParameterTool.fromArgs(args)
     val paramDefaults = ParameterTool.fromArgs(Array("--bootstrap-servers", "localhost:9092",
-                                                     "--input-kafka-topic", "sensebox-measurements",
+                                                     "--kafka-input-topic", "sensebox-measurements",
+                                                     "--kafka-group-id", "FlinkDbSink",
                                                      "--db-connection-string", "jdbc:postgresql:sbm"))
 
     val params = paramDefaults.mergeWith(paramCmdline)
 
     val bootstrapServers = params.get("bootstrap-servers")
-    val inputKafkaTopic = params.get("input-kafka-topic")
+    val inputKafkaTopic = params.get("kafka-input-topic")
 
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.main")
     logger.info(s"Connecting Apache Kafka on $bootstrapServers for topic $inputKafkaTopic")
@@ -50,16 +51,19 @@ object Main {
     //TODO: setupDb() bzw. Tabellenexistenz prüfen (oder zumindest erkennen, wenn die Tabelle nicht existiert und mit sinnvollem Fehler sterben)
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.enableCheckpointing
+
     val properties = new Properties {
       put("bootstrap.servers", bootstrapServers)
+      put("group.id", params.get("kafka-group-id"))
     }
-    val stream = env
-      .addSource(function = new FlinkKafkaConsumer09[ObjectNode](inputKafkaTopic, new JSONDeserializationSchema(), properties))
-      //TODO: split() nach gültig/ungültig
-      //TODO: ungültig per Kafka raus
-      //TODO: split(gültig) nach Duplikat/Unikat
-      //TODO: Duplikat per Kafka raus
-      .addSink(el => saveMeasurement(params, el)) //TODO: nur Unikat
+    val inputStream = env.addSource(new FlinkKafkaConsumer09[ObjectNode](inputKafkaTopic, new JSONDeserializationSchema(), properties))
+    //TODO: transformieren in JSON (explizit weil Prüfung, stattdessen String/Byte-Deserializer
+    //TODO: split() nach gültig/ungültig
+    //TODO: ungültig per Kafka raus
+    //TODO: split(gültig) nach Duplikat/Unikat
+    //TODO: Duplikat per Kafka raus
+    inputStream.addSink(el => saveMeasurement(params, el)) //TODO: nur Unikat
 
     //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
