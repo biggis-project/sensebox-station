@@ -12,12 +12,16 @@ import org.apache.flink.streaming.util.serialization.SimpleStringSchema
 import org.apache.flink.api.java.utils.ParameterTool
 
 import play.api.libs.json._
+import play.api.libs.json.Reads._
+import play.api.libs.functional.syntax._
 
 import scalikejdbc.ConnectionPool
 import anorm._
 
 import org.slf4j.LoggerFactory
 import org.slf4j.Logger
+
+case class Reading(boxId: String, sensor: String, createdAt: String, value: Double)
 
 object Main {
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
@@ -126,9 +130,19 @@ object Main {
   def validateJson(json: JsObject): JsObject = {
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.validateJson")
 
-    //TODO
+    implicit val inputReads: Reads[Reading] = (
+      (JsPath \ "boxId").read[String] and
+      (JsPath \ "sensor").read[String] and
+      (JsPath \ "createdAt").read[String] and
+      (JsPath \ "value").read[Double]
+    )(Reading.apply _)
 
-    return json
+    val resultJson = (json \ "input").validate[Reading] match {
+      case s: JsSuccess[Reading] => json
+      case e: JsError => json + ("error" -> JsString("JSON input is missing required field(s)"))
+    }
+
+    return resultJson
   }
 
   def checkUnique(params: ParameterTool, json: JsObject): JsObject = {
