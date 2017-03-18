@@ -3,7 +3,8 @@ import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Properties
 
-import com.fasterxml.jackson.databind.node.ObjectNode
+import org.apache.commons.lang3.time.DateUtils
+
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer09
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer09
@@ -45,6 +46,7 @@ object Main {
                                                      "--kafka-output-topic-invalid", "sensebox-measurements-error",
                                                      "--kafka-output-topic-duplicate", "sensebox-measurements-error",
                                                      "--kafka-group-id", "FlinkDbSink",
+                                                     "--duplicate-filter-interval", "1",
                                                      "--db-connection-string", "jdbc:postgresql:sbm"))
 
     val params = paramDefaults.mergeWith(paramCmdline)
@@ -86,7 +88,7 @@ object Main {
     if (params.get("kafka-output-topic-invalid") != "''")
       validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-invalid"), new SimpleStringSchema()))
 
-    val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(el))
+    val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(params, el))
 
     val uniquenessCheckedSplitStream = uniquenessCheckedStream.split(el => el.keys.contains("error") match {
       case true => List("error")
@@ -129,12 +131,39 @@ object Main {
     return json
   }
 
-  def checkUnique(json: JsObject): JsObject = {
+  def checkUnique(params: ParameterTool, json: JsObject): JsObject = {
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.checkUnique")
 
-    //TODO: UPSERT/klarkommen, wenn Measurement schon drin weil doppelt ausgeliefert (möglichst auch mit (konfigurierbarem) deltaTimestamp weil das über Codekunst und TTN mit leicht unterschiedlichem TS reinkam)
+    val input = json \ "input"
 
-    return json
+    val boxId = (input \ "boxId").as[String]
+    val sensorId = (input \ "sensor").as[String]
+    val timestamp = (input \ "createdAt").as[String]
+
+    val ts = dateFormat.parse(timestamp)
+    val sqlTs = new Timestamp(ts.getTime)
+
+    val sqlFromTs = new Timestamp(DateUtils.addSeconds(ts, -params.getInt("duplicate-filter-interval")).getTime)
+    val sqlToTs   = new Timestamp(DateUtils.addSeconds(ts, params.getInt("duplicate-filter-interval")).getTime)
+
+    val recordExists = try {
+      DB.withConnection { implicit connection: Connection =>
+        SQL"SELECT 1 AS recordexists FROM measurements WHERE boxid=${boxId} AND sensorid=${sensorId} AND ts BETWEEN ${sqlFromTs} AND ${sqlToTs}".as(SqlParser.int("recordexists").single)
+     }
+    }
+    catch {
+      case e: Exception => if (e.getMessage == "SqlMappingError(No rows when expecting a single one)") 0 else logger.error(e.getMessage)
+    }
+
+    logger.debug(s"Check returned '$recordExists'")
+
+    val resultJson = recordExists match {
+      case 1 => json + ("error" -> JsString("Sensor reading already exists in database"))
+      case 0 => json
+      case () => json
+    }
+
+    return resultJson
   }
 
   def saveMeasurement(params: ParameterTool, ev: JsObject): Unit = {
@@ -156,7 +185,7 @@ object Main {
 
     try {
       DB.withConnection { implicit connection: Connection =>
-        SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute(); //TODO: Fehlerbehandlung
+        SQL"INSERT INTO measurements(boxid, sensorid, ts, value) VALUES($boxId, $sensorId, $sqlTs, $value)".execute();
       }
     }
     catch {

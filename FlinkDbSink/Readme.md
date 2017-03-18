@@ -56,6 +56,19 @@ An empty string('', just the quotes) disables output for the respective error ty
 
 
 
+Duplicate Filter
+----------------
+
+Command line: "--duplicate-filter-interval"
+
+Default value: "1"
+
+Expected value: an integer
+
+A sensor reading being within +/- $value seconds to an existing reading will be discarded as duplicate.
+
+
+
 DB Connection String
 --------------------
 
