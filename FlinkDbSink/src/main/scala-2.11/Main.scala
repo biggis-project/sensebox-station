@@ -137,12 +137,23 @@ object Main {
       (JsPath \ "value").read[Double]
     )(Reading.apply _)
 
-    val resultJson = (json \ "input").validate[Reading] match {
-      case s: JsSuccess[Reading] => json
-      case e: JsError => json + ("error" -> JsString("JSON input is missing required field(s)"))
+    (json \ "input").validate[Reading] match {
+      case s: JsSuccess[Reading] => {}
+      case e: JsError => return json + ("error" -> JsString("JSON input is missing required field(s)"))
     }
 
-    return resultJson
+    try {
+      val timestamp = (json \ "input" \ "createdAt").as[String]
+      dateFormat.parse(timestamp)
+    }
+    catch {
+      case e: Exception => {
+        logger.error("Can't parse input field 'createdAt' as JSON Date")
+        return json + ("error" -> JsString(s"Can't parse input field 'createdAt' as JSON Date"))
+      }
+    }
+
+    return json
   }
 
   def checkUnique(params: ParameterTool, json: JsObject): JsObject = {
@@ -155,7 +166,6 @@ object Main {
     val timestamp = (input \ "createdAt").as[String]
 
     val ts = dateFormat.parse(timestamp)
-    val sqlTs = new Timestamp(ts.getTime)
 
     val sqlFromTs = new Timestamp(DateUtils.addSeconds(ts, -params.getInt("duplicate-filter-interval")).getTime)
     val sqlToTs   = new Timestamp(DateUtils.addSeconds(ts, params.getInt("duplicate-filter-interval")).getTime)
