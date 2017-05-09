@@ -7,3 +7,27 @@
 - Build a component which pulls the data from TheThingsNetwork into the BigGIS pipeline.
 - Persist the sensor measurements in a relational database. The database used shall
   be configurable supporting multiple different database systems.
+
+## Architecture
+
+![Architecture overview](docs/img/architecture-flow.png)
+
+
+## Components
+### LoRaSenseNode
+...
+
+### WLanSenseNode
+...
+
+### SenseBoxSimpleRestServer
+...
+
+### CodekunstMQTTAdapter
+...
+
+### FlinkDbSink
+...
+
+### StationDeploy
+...
