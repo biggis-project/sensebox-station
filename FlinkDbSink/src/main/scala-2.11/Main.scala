@@ -80,7 +80,9 @@ object Main {
     })
 
     if (params.get("kafka-output-topic-unparseable") != "''")
-      parseableSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-unparseable"), new SimpleStringSchema()))
+      parseableSplitStream.select("error")
+        .map(el => el toString)
+        .addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-unparseable"), new SimpleStringSchema())).name("unparseable JSON")
 
     val validatedStream = parseableSplitStream.select("ok").map(el => validateJson(el))
 
@@ -90,7 +92,9 @@ object Main {
     })
 
     if (params.get("kafka-output-topic-invalid") != "''")
-      validatedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-invalid"), new SimpleStringSchema()))
+      validatedSplitStream.select("error")
+        .map(el => el toString)
+        .addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-invalid"), new SimpleStringSchema())).name("invalid JSON errors")
 
     val uniquenessCheckedStream = validatedSplitStream.select("ok").map(el => checkUnique(params, el))
 
@@ -100,9 +104,11 @@ object Main {
     })
 
     if (params.get("kafka-output-topic-duplicate") != "''")
-      uniquenessCheckedSplitStream.select("error").map(el => el toString).addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-duplicate"), new SimpleStringSchema()))
+      uniquenessCheckedSplitStream.select("error")
+        .map(el => el toString)
+        .addSink(new FlinkKafkaProducer09(bootstrapServers, params.get("kafka-output-topic-duplicate"), new SimpleStringSchema())).name("duplicate reading errors")
 
-    uniquenessCheckedSplitStream.select("ok").addSink(el => saveMeasurement(params, el))
+    uniquenessCheckedSplitStream.select("ok").addSink(el => saveMeasurement(params, el)).name("JDBC")
 
     //TODO: kann man die Source/Sink irgendwie sinnvoll benennen, damit das in der Management Console schöner aussieht?
     env.execute("Sensebox Measurements DB Sink")
@@ -190,10 +196,15 @@ object Main {
     return resultJson
   }
 
+  var workerHasConnection = false;
   def saveMeasurement(params: ParameterTool, ev: JsObject): Unit = {
     val logger = LoggerFactory.getLogger("eu.biggis-project.sensebox-station.flinkDbSink.saveMeasurements")
+    //logger.info("Connections: " + ConnectionPool.numActive + "/" + ConnectionPool.numIdle)
 
-    ConnectionPool.singleton(params.get("db-connection-string"), params.get("db-user"), params.get("db-pass"))
+    if (!workerHasConnection) {
+      ConnectionPool.singleton(params.get("db-connection-string"), params.get("db-user"), params.get("db-pass"))
+      workerHasConnection = true
+    }
 
     val input = ev \ "input"
 

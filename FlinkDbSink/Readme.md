@@ -78,7 +78,7 @@ Default value: "jdbc:postgresql:sbm"
 
 Expected value: any valid JDBC connection string
 
-Currently, only PostgreSQL JDBC driver is linked into job
+Currently, only MySQL and PostgreSQL JDBC drivers are linked into job
 
 
 
