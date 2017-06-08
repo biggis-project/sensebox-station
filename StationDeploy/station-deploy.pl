@@ -17,8 +17,8 @@ our $srcDir = '/home/lutz/BigGIS/sensebox-station/LoRaSenseNode';
 our ($devId) = @ARGV;
 
 ttnCheckLogin();
-my ($devEUI, $appKey) = getTtnInfo();
-programDevice($devId, $devEUI, $appKey);
+my ($appEUI, $devEUI, $appKey) = getTtnInfo();
+programDevice($devId, $appEUI, $devEUI, $appKey);
 
 sub ttnCheckLogin {
   my ($stdout, $stderr, $rc) = tap( $ttnctl, 'user' );
@@ -36,12 +36,12 @@ sub ttnCheckLogin {
 }
 
 sub getTtnInfo {
-  my ($devEUI, $appKey) = ttnCheckDevice($devId);
+  my ($appEUI, $devEUI, $appKey) = ttnCheckDevice($devId);
 
   if ($devEUI and $appKey) {
-    say "Device $devId existiert bereits. Verwende DevEUI=$devEUI, AppKey=$appKey";
+    say "Device $devId existiert bereits. Verwende AppEUI=$appEUI, DevEUI=$devEUI, AppKey=$appKey";
 
-    return ($devEUI, $appKey)
+    return ($appEUI, $devEUI, $appKey)
   }
 
   if ($devId) {
@@ -52,9 +52,9 @@ sub getTtnInfo {
     say "Erstelle Device $devId.";
   }
 
-  ($devEUI, $appKey) = ttnRegisterDevice($devId);
+  ($appEUI, $devEUI, $appKey) = ttnRegisterDevice($devId);
 
-  return ($devEUI, $appKey);
+  return ($appEUI, $devEUI, $appKey);
 }
 
 sub ttnRegisterDevice {
@@ -62,14 +62,14 @@ sub ttnRegisterDevice {
 
   my ($stdout, $stderr, $rc) = tap($ttnctl, 'devices', 'register', $devId);
 
-  my ($appKey, $devEUI) = $stdout =~ /AppKey\e\[\d+m=(\S+).*DevEUI\e\[\d+m=(\S+)/;
+  my ($appEUI, $appKey, $devEUI) = $stdout =~ /AppEUI\e\[\d+m=(\S+).*AppKey\e\[\d+m=(\S+).*DevEUI\e\[\d+m=(\S+)/;
 
   unless ($devEUI and $appKey) {
     say "Can't find AppKey and DevEUI in output of ttnctl.";
     exit -1;
   }
 
-  return ($devEUI, $appKey);
+  return ($appEUI, $devEUI, $appKey);
 }
 
 sub ttnCheckDevice {
@@ -81,10 +81,11 @@ sub ttnCheckDevice {
 
   return if ($stdout =~ /Could not get existing device/); ### existiert nicht
 
+  my ($appEUI) = $stdout =~ /AppEUI: ([0-9A-F]+)/;
   my ($devEUI) = $stdout =~ /DevEUI: ([0-9A-F]+)/;
   my ($appKey) = $stdout =~ /AppKey: ([0-9A-F]+)/;
 
-  return ($devEUI, $appKey);
+  return ($appEUI, $devEUI, $appKey);
 }
 
 sub ttnAutoDevId {
@@ -108,12 +109,13 @@ sub ttnAutoDevId {
 }
 
 sub programDevice {
-  my ($devId, $devEUI, $appKey) = @_;
+  my ($devId, $appEUI, $devEUI, $appKey) = @_;
 
+  my $appEUIstr = join ', ', map { "0x$_" } reverse $appEUI =~ /(..)/g;
   my $devEUIstr = join ', ', map { "0x$_" } reverse $devEUI =~ /(..)/g;
   my $appKeyStr = join ', ', map { "0x$_" } $appKey =~ /(..)/g;
 
-  local $ENV{PLATFORMIO_SRC_BUILD_FLAGS} = "-DDevEUI='{ $devEUIstr }' -DAppKey='{ $appKeyStr }'";
+  local $ENV{PLATFORMIO_SRC_BUILD_FLAGS} = "-DAppEUI='{ $appEUIstr }' -DDevEUI='{ $devEUIstr }' -DAppKey='{ $appKeyStr }'";
 
   chdir($srcDir);
   system($pio, 'run', '--target=upload');
