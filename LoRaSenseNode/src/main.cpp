@@ -229,18 +229,13 @@ void initSensors() {
   Wire.beginTransmission(UV_ADDR);
   Wire.write((IT_1 << 2) | 0x02);
   Wire.endTransmission();
-  Serial.println("CP1");
   delay(500);
 
-
   hdc.begin(0x43);
-  Serial.println("CP1.1");
   hdc.readTemperature(); // weil erstes Reading Müll ist
   hdc.readHumidity(); // same
-  Serial.println("CP2");
 
   tsl.begin();
-  Serial.println("CP3");
 
   if (!bmp.begin())
     Serial.println(F("Failure initializing BMP280"));
@@ -251,7 +246,7 @@ void initSensors() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println(F("Starting BigGIS Sensor Node ..."));
+  Serial.println(F("Starting BigGIS LoRa Sensor Node ..."));
 
   pinMode(4, INPUT);
   digitalWrite(4, HIGH);
