@@ -59,8 +59,9 @@ static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-//const unsigned TX_INTERVAL = 600;
-const unsigned TX_INTERVAL = 15;
+#ifndef TX_INTERVAL
+#define TX_INTERVAL 600
+#endif
 
 // Pin mapping for Dragino LoRa Shield V1.3/V1.4
 const lmic_pinmap lmic_pins = {
