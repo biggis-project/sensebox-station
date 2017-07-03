@@ -19,7 +19,7 @@ for details). The config file must be specified by using the parameter "-Dconfig
 front of "-jar ...").
 
 http.port
-        The HTTP port SBSRS is listening. Default: "9000".
+        The HTTP port SBSRS is listening. Default: "9100".
 
 sbsrs.kafkaServer
         The Kafka server SBSRS connects to. You can provide multiple server as "server1:port1,server2:port2,...". Default: "localhost:9092"
