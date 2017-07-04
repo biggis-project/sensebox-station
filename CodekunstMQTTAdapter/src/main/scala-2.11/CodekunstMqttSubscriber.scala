@@ -117,7 +117,7 @@ object CodekunstMqttSubscriber {
     val tempTS = seconds match {
       case Some(i) => {
         val roundedSeconds = math.rint(i.toFloat * 1000) / 1000
-        inputTS replaceFirst(i, s"$roundedSeconds")
+        inputTS replaceFirst(i, if (roundedSeconds < 10) s"0$roundedSeconds" else s"$roundedSeconds")
       }
       case None => inputTS
     }
