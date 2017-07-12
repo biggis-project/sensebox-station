@@ -23,6 +23,18 @@ object CodekunstMqttSubscriber {
 
   val config = ConfigFactory.load
 
+  val mode = config.getStringOrDefault("mode", "ttn")
+  if (mode == "codekunst") {
+    println("Working in Codekunst mode.")
+  }
+  else if (mode == "ttn") {
+    println("Working in TTN mode")
+  }
+  else {
+    println(s"Unknown mode '$mode'. Terminating.")
+    System.exit(1)
+  }
+
   val mqttUrl = config.getStringOrDefault("mqtt.brokerUrl", "tcp://localhost:1883")
   val mqttTopic = config.getStringOrDefault("mqtt.topic", "application/+/node/+/rx")
 
@@ -65,7 +77,7 @@ object CodekunstMqttSubscriber {
     //Callback automatically triggers as and when new message arrives on specified topic
     val callback = new MqttCallback {
       override def messageArrived(topic: String, message: MqttMessage): Unit = {
-        println("Receiving Data, Topic : %s, Message : %s".format(topic, message))
+        println("Received data with topic: '%s', message content: '%s'".format(topic, message))
         parseMessage(message)
       }
 
@@ -91,37 +103,33 @@ object CodekunstMqttSubscriber {
       }
     }
 
-    if (!inputJson.keys.contains("devEUI")) {
-      println("Incoming JSON does not contain necessary key 'devEUI'. Ignoring message.")
-      return
-    }
-    val devEUI = (inputJson \ "devEUI").as[String]
-
-    if (!inputJson.keys.contains("rxInfo")
-      || !(inputJson \ "rxInfo").get.isInstanceOf[JsArray]
-      || !(inputJson \ "rxInfo")(0).get.isInstanceOf[JsObject]
-      || !(inputJson \ "rxInfo")(0).as[JsObject].keys.contains("time")) {
-      println("Incoming JSON does not contain necessary key 'rxInfo[0].time'. Ignoring message.")
-      return
-    }
-    val inputTS = ((inputJson \ "rxInfo")(0) \ "time").as[String]
-
-    if (!inputJson.keys.contains("data")) {
-      println("Incoming JSON does not contain necessary key 'data'. Ignoring message.")
-      return
-    }
-    val rawData = (inputJson \ "data").as[String]
     println(inputJson)
 
-    val seconds = "\\d{2}\\.\\d+".r findFirstIn inputTS
-    val tempTS = seconds match {
-      case Some(i) => {
-        val roundedSeconds = math.rint(i.toFloat * 1000) / 1000
-        inputTS replaceFirst(i, if (roundedSeconds < 10) s"0$roundedSeconds" else s"$roundedSeconds")
+    val parser = if (mode=="ttn") new TtnMqttMessageParser(inputJson) else new CodekunstMqttMessageParser(inputJson)
+
+    val deviceId = parser.getDeviceId() match {
+      case Some(e) => e
+      case None => {
+        println("No device ID found. Ignoring message.")
+        return
       }
-      case None => inputTS
     }
-    val outputTS = tempTS replaceFirst("Z$", "+0000")
+
+    val outputTS = parser.getTimestamp() match {
+      case Some(e) => e
+      case None => {
+        println("No timestamp found. Ignoring message.")
+        return
+      }
+    }
+
+    val rawData = parser.getRawData() match {
+      case Some(e) => e
+      case None => {
+        println("No raw data found. Ignoring message.")
+        return
+      }
+    }
 
     // decodeBuffer liefert Bytes statt Chars, deswegen fixen wir das per map()
     val bytes = base64Decoder.decodeBuffer(rawData).map((i: Byte) => if (i < 0) i + 256 else i)
@@ -133,12 +141,12 @@ object CodekunstMqttSubscriber {
     val lux = bytes(8) + 255 * (bytes(10)*256 + bytes(9))
     val uv = bytes(11) + 255 * (bytes(13)*256 + bytes(12))
 
-    sendValue(devEUI, outputTS, "temperature", temperature)
-    sendValue(devEUI, outputTS, "humidity", humidity)
-    sendValue(devEUI, outputTS, "pressure", pressure)
-    sendValue(devEUI, outputTS, "temperatureInternal", temperatureIntern)
-    sendValue(devEUI, outputTS, "light", lux)
-    sendValue(devEUI, outputTS, "uv", uv)
+    sendValue(deviceId, outputTS, "temperature", temperature)
+    sendValue(deviceId, outputTS, "humidity", humidity)
+    sendValue(deviceId, outputTS, "pressure", pressure)
+    sendValue(deviceId, outputTS, "temperatureInternal", temperatureIntern)
+    sendValue(deviceId, outputTS, "light", lux)
+    sendValue(deviceId, outputTS, "uv", uv)
   }
 
   def sendValue(boxId: String, timestamp: String, sensor: String, value: Double): Unit = {
