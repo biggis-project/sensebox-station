@@ -9,7 +9,7 @@ truststore=$1
 
 set -e
 
-wget https://console.thethingsnetwork.org/mqtt-ca.pem
+curl -OL https://console.thethingsnetwork.org/mqtt-ca.pem
 
 csplit --prefix=mqtt-certpart- --suffix-format='%02d.pem' --elide-empty-files mqtt-ca.pem '/-----BEGIN CERTIFICATE-----/' '{*}'
 
