@@ -19,6 +19,12 @@ object CodekunstMqttSubscriber {
     } else {
       default
     }
+
+    def getOptionalString(path: String): Option[String] = if (underlying.hasPath(path)) {
+      Some(underlying.getString(path))
+    } else {
+      None
+    }
   }
 
   val config = ConfigFactory.load
@@ -28,15 +34,29 @@ object CodekunstMqttSubscriber {
     println("Working in Codekunst mode.")
   }
   else if (mode == "ttn") {
-    println("Working in TTN mode")
+    println("Working in TTN mode.")
   }
   else {
     println(s"Unknown mode '$mode'. Terminating.")
     System.exit(1)
   }
 
-  val mqttUrl = config.getStringOrDefault("mqtt.brokerUrl", "tcp://localhost:1883")
-  val mqttTopic = config.getStringOrDefault("mqtt.topic", "application/+/node/+/rx")
+  val mqttUrl = config.getStringOrDefault("mqtt.brokerUrl", if (mode=="ttn") "ssl://eu.thethings.network:8883" else "tcp://localhost:1883")
+  val mqttTopic = config.getStringOrDefault("mqtt.topic", if (mode=="ttn") "+/devices/+/up" else "application/+/node/+/rx")
+  val mqttUser = config.getOptionalString("mqtt.user")
+  val mqttPassword = config.getOptionalString("mqtt.password")
+
+  if (mode=="ttn") {
+    if (mqttUser.isEmpty) {
+      println("Config key 'mqtt.user' is required in ttn mode. Terminating.")
+      System.exit(1)
+    }
+
+    if (mqttPassword.isEmpty) {
+      println("Config key 'mqtt.password' is required in ttn mode. Terminating.")
+      System.exit(1)
+    }
+  }
 
   val kafkaHost = config.getStringOrDefault("kafka.server", "localhost:9092")
   val kafkaTopic = config.getStringOrDefault("kafka.topic", "sensebox-measurements")
@@ -69,7 +89,13 @@ object CodekunstMqttSubscriber {
     val client = new MqttClient(mqttUrl, MqttClient.generateClientId, persistence)
 
     //Connect to MqttBroker
-    client.connect
+    val mqttConnectOptions: MqttConnectOptions = new MqttConnectOptions()
+    if (mode=="ttn") {
+      //mqttUser and mqttPassword are validated above to be not None. So no match required here
+      mqttConnectOptions.setUserName(mqttUser.get)
+      mqttConnectOptions.setPassword(mqttPassword.get.toCharArray)
+    }
+    client.connect(mqttConnectOptions)
 
     //Subscribe to Mqtt topic
     client.subscribe(mqttTopic)
