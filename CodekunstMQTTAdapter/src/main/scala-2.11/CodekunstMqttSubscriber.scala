@@ -60,6 +60,7 @@ object CodekunstMqttSubscriber {
 
   val kafkaHost = config.getStringOrDefault("kafka.server", "localhost:9092")
   val kafkaTopic = config.getStringOrDefault("kafka.topic", "sensebox-measurements")
+  val kafkaUnifiedTopic = config.getStringOrDefault("kafka.unifiedTopic", "sensebox-measurements-unified")
 
   val base64Decoder = new sun.misc.BASE64Decoder()
 
@@ -173,6 +174,8 @@ object CodekunstMqttSubscriber {
     sendValue(deviceId, outputTS, "temperatureInternal", temperatureIntern)
     sendValue(deviceId, outputTS, "light", lux)
     sendValue(deviceId, outputTS, "uv", uv)
+
+    sendUnifiedMessage(deviceId, outputTS, temperature, humidity, pressure, temperatureIntern, lux, uv)
   }
 
   def sendValue(boxId: String, timestamp: String, sensor: String, value: Double): Unit = {
@@ -199,6 +202,43 @@ object CodekunstMqttSubscriber {
       }
       case e: Exception => {
         println(s"Kafka error: ${e.getMessage}")
+      }
+    }
+  }
+
+  def sendUnifiedMessage(boxId: String, timestamp: String, temperature: Double, humidity: Double, pressure: Double, temperatureInternal: Double, lux: Double, uv: Double): Unit = {
+    val json = Json.obj(
+      "boxId"               -> boxId,
+      "createdAt"           -> timestamp,
+      "temperature"         -> temperature,
+      "humidity"            -> humidity,
+      "pressure"            -> pressure,
+      "temperatureInternal" -> temperatureInternal,
+      "lux"                 -> lux,
+      "uv"                  -> uv
+    )
+    println(json)
+
+    val record = try {
+      new ProducerRecord(kafkaUnifiedTopic, "Test", json.toString)
+    }
+    catch {
+      case e: Exception => {
+        println(s"Kafka create record error: ${e.getMessage}")
+        null
+      }
+    }
+
+    try {
+      val f = kafka.send(record)
+      f.get
+    }
+    catch {
+      case e: ExecutionException => {
+        println(s"Kafka send execution: ${e.getMessage}")
+      }
+      case e: Exception => {
+        println(s"Kafka send error: ${e.getMessage}")
       }
     }
   }

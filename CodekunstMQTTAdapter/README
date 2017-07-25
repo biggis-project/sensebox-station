@@ -15,19 +15,20 @@ $ java [-Dparameter=wert ...] -jar CodekunstMQTTAdapter-assembly-1.0.jar
 
 Gültige Parameter:
 
-mode             Umschaltung zwischen Codekunst-Modus ('mode=codekunst') und TTN ('mode=ttn').
-                 Default: 'ttn'
-mqtt.brokerUrl   Die Adresse des MQTT-Brokers
-                 Default: 'tcp://localhost:1883' ('Codekunst') bzw. 'ssl://eu.thethings.network' (TTN)
-                 Für SSL: ssl://hostname:8883
-mqtt.topic       Das Topic, das abonniert wird.
-                 Default 'application/+/node/+/rx' (Codekunst) bzw. '+/devices/+/up' (TTN)
-                 passt für die Default-Server der beiden Modi
-mqtt.user        Der MQTT-Benutzer. Nur bei mode=ttn nötig
-mqtt.password    Das MQTT-Passwort. Nur bei mode=ttn nötig
-kafka.server     Der (oder die) Kafka-Server (Default: 'localhost:9092')
-                 Mehrere Server als 'server1:port1,server2:port2,...'
-kafka.topic      Das Kafka-Topic, an das gesendet wird (Default: 'sensebox-measurements')
+mode                Umschaltung zwischen Codekunst-Modus ('mode=codekunst') und TTN ('mode=ttn').
+                    Default: 'ttn'
+mqtt.brokerUrl      Die Adresse des MQTT-Brokers
+                    Default: 'tcp://localhost:1883' ('Codekunst') bzw. 'ssl://eu.thethings.network' (TTN)
+                    Für SSL: ssl://hostname:8883
+mqtt.topic          Das Topic, das abonniert wird.
+                    Default 'application/+/node/+/rx' (Codekunst) bzw. '+/devices/+/up' (TTN)
+                    passt für die Default-Server der beiden Modi
+mqtt.user           Der MQTT-Benutzer. Nur bei mode=ttn nötig
+mqtt.password       Das MQTT-Passwort. Nur bei mode=ttn nötig
+kafka.server        Der (oder die) Kafka-Server (Default: 'localhost:9092')
+                    Mehrere Server als 'server1:port1,server2:port2,...'
+kafka.topic         Das Kafka-Topic, an das gesendet wird (Default: 'sensebox-measurements')
+kafka.unifiedTopic  Das Kafka-Topic für den zusammengefassten Event-Strom (Default: 'sensebox-measurements-unified')
 
 
 Setup
