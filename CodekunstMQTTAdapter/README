@@ -28,7 +28,9 @@ mqtt.password       Das MQTT-Passwort. Nur bei mode=ttn nötig
 kafka.server        Der (oder die) Kafka-Server (Default: 'localhost:9092')
                     Mehrere Server als 'server1:port1,server2:port2,...'
 kafka.topic         Das Kafka-Topic, an das gesendet wird (Default: 'sensebox-measurements')
+                    Per leerem String kann das Verschicken von einzelnen Events deaktiviert werden.
 kafka.unifiedTopic  Das Kafka-Topic für den zusammengefassten Event-Strom (Default: 'sensebox-measurements-unified')
+                    Per leerem String kann das Verschicken von zusammengefassten Events deaktiviert werden.
 
 
 Setup

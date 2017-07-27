@@ -179,6 +179,9 @@ object CodekunstMqttSubscriber {
   }
 
   def sendValue(boxId: String, timestamp: String, sensor: String, value: Double): Unit = {
+    if (kafkaTopic == "")
+      return
+
     val json = Json.obj("boxId" -> boxId, "createdAt" -> timestamp, "sensor" -> sensor, "value" -> value)
     println(json)
 
@@ -207,6 +210,9 @@ object CodekunstMqttSubscriber {
   }
 
   def sendUnifiedMessage(boxId: String, timestamp: String, temperature: Double, humidity: Double, pressure: Double, temperatureInternal: Double, lux: Double, uv: Double): Unit = {
+    if (kafkaUnifiedTopic == "")
+      return
+
     val json = Json.obj(
       "boxId"               -> boxId,
       "createdAt"           -> timestamp,
